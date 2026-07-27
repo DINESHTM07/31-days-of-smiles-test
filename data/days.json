@@ -8,6 +8,13 @@
       "game": "mood-check",
       "song": "",
       "published": true
+    },
+    {
+      "day": 2,
+      "letter": "vanakkam da maapla",
+      "game": "trivia",
+      "song": "https://youtu.be/v687_iZ3UKU?si=5mWjx78BrjDDcGgv",
+      "published": true
     }
   ]
 }
