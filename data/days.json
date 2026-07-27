@@ -4,10 +4,10 @@
   "days": [
     {
       "day": 1,
-      "letter": "",
-      "game": null,
+      "letter": "Hello Deepa ❤️\n\nThis is a test letter.",
+      "game": "this-or-that",
       "song": "",
-      "published": false
+      "published": true
     }
   ]
 }
