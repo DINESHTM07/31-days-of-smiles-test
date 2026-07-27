@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>31 Days of Smiles</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B1330">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Passcode Screen -->
+  <div class="screen" id="screen-passcode">
+    <div class="lock-icon">✦</div>
+    <div class="kicker">something small, for someone big</div>
+    <div class="passcode-title">Enter the word<br/>only she would know</div>
+    <input type="text" id="passcode-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="•••••••••" aria-label="Passcode" />
+    <div class="passcode-hint" id="passcode-hint" role="status" aria-live="polite">&nbsp;</div>
+    <button class="enter-btn" id="enter-btn">Enter</button>
+  </div>
+
+  <!-- Welcome / Day 1 Screen -->
+  <div class="screen" id="screen-welcome">
+    <div class="welcome-line">something small, for someone big</div>
+    <div class="welcome-seal">
+      <div class="seal" style="margin:0 auto;">K</div>
+    </div>
+  </div>
+
+  <!-- Home Screen -->
+  <div class="screen" id="screen-home">
+    <div class="top-row">
+      <div class="day-row">
+        <span class="day-num" id="day-num">Day 01</span>
+        <span class="streak" id="streak-count">· 1 day streak</span>
+      </div>
+      <button class="archive-btn" id="archive-btn" aria-label="View letter archive">archive</button>
+    </div>
+    <div class="greeting">good morning, Kullanari</div>
+    <div id="letter-slot"></div>
+  </div>
+
+  <!-- Archive Screen -->
+  <div class="screen" id="screen-archive">
+    <div class="archive-header">
+      <button class="back-btn" id="back-btn" aria-label="Back to home">←</button>
+      <div class="archive-title">Every letter so far</div>
+    </div>
+    <div class="archive-list" id="archive-list"></div>
+  </div>
+
+</div>
+
+<script src="scripts/games.js"></script>
+<script src="scripts/app.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>

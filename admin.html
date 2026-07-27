@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Write Today's Letter</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="styles/main.css">
+<style>
+  body{ overflow:auto; }
+  #admin-app{ max-width:520px; margin:0 auto; padding:40px 24px 80px; }
+  h1{ font-family:'Fraunces', serif; font-weight:500; font-size:22px; margin-bottom:6px; }
+  p.sub{ color:var(--muted); font-size:13px; margin-bottom:30px; }
+  label{ display:block; font-size:12px; color:var(--muted); letter-spacing:0.04em; margin:18px 0 6px; }
+  input[type=text], input[type=password], input[type=number], textarea, select{
+    width:100%; background:var(--card); border:1px solid rgba(255,255,255,0.08); color:var(--ivory);
+    border-radius:10px; padding:12px 14px; font-family:'Inter',sans-serif; font-size:14px; outline:none;
+  }
+  textarea{ min-height:160px; resize:vertical; font-family:'Fraunces', serif; font-size:15px; line-height:1.5; }
+  .row{ display:flex; gap:12px; }
+  .row > div{ flex:1; }
+  button.primary{
+    margin-top:26px; width:100%; background:var(--clay); color:#fff2e6; border:none;
+    padding:14px; border-radius:12px; font-family:'Inter',sans-serif; font-weight:600; font-size:15px; cursor:pointer;
+  }
+  button.primary:disabled{ opacity:0.5; }
+  .status{ margin-top:14px; font-size:13px; color:var(--muted); white-space:pre-wrap; }
+  .status.ok{ color:#8fd4a8; }
+  .status.err{ color:#e08a8a; }
+  fieldset{ border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:16px; margin-top:26px; }
+  legend{ font-size:12px; color:var(--muted); padding:0 6px; }
+  .hint{ font-size:11px; color:var(--muted); margin-top:6px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div id="admin-app">
+  <h1>Write today's letter</h1>
+  <p class="sub">Private page — not linked anywhere on her version of the site.</p>
+
+  <label for="passcode">Admin passcode</label>
+  <input type="password" id="passcode" placeholder="•••••••••" autocomplete="off"/>
+
+  <fieldset>
+    <legend>One-time setup (saved only in this browser)</legend>
+    <label for="gh-token">GitHub personal access token</label>
+    <input type="password" id="gh-token" placeholder="ghp_..." autocomplete="off"/>
+    <div class="hint">Needs "repo" content read/write access on the repo below. Create one at github.com → Settings → Developer settings → Personal access tokens. Never share this token or commit it anywhere.</div>
+    <div class="row">
+      <div>
+        <label for="gh-owner">GitHub username</label>
+        <input type="text" id="gh-owner" placeholder="yourusername"/>
+      </div>
+      <div>
+        <label for="gh-repo">Repository name</label>
+        <input type="text" id="gh-repo" placeholder="31-days-of-smiles"/>
+      </div>
+    </div>
+    <label for="gh-branch">Branch</label>
+    <input type="text" id="gh-branch" placeholder="main" value="main"/>
+    <label for="ntfy-topic">Notification topic (optional)</label>
+    <input type="text" id="ntfy-topic" placeholder="e.g. smiles-for-kullanari-7f2a"/>
+    <div class="hint">Uses the free ntfy.sh service — no signup needed. Pick any hard-to-guess topic name, then have her subscribe to it once at ntfy.sh/&lt;that name&gt; or in the ntfy app. Leave blank to skip notifications.</div>
+    <button class="primary" id="save-config" style="background:var(--card-hi); color:var(--ivory);">Save setup</button>
+  </fieldset>
+
+  <label for="day-number">Day number</label>
+  <input type="number" id="day-number" min="1" value="1"/>
+
+  <label for="letter-text">Today's letter</label>
+  <textarea id="letter-text" placeholder="Write it like you're talking to her..."></textarea>
+
+  <label for="game-type">Mini-game (optional)</label>
+  <select id="game-type">
+    <option value="">None</option>
+    <option value="trivia">Trivia</option>
+    <option value="this-or-that">This or that</option>
+    <option value="finish-the-joke">Finish the joke</option>
+    <option value="gratitude">A little pause (gratitude prompt)</option>
+    <option value="mood-check">Mood check</option>
+  </select>
+
+  <label for="song-link">Song link (optional)</label>
+  <input type="text" id="song-link" placeholder="https://..."/>
+
+  <button class="primary" id="publish-btn">Publish today's letter</button>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+const ADMIN_PASSCODE = "kullanari";
+const CFG_KEY = "smiles_admin_config_v1";
+
+function loadCfg(){
+  try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch(e){ return {}; }
+}
+function saveCfg(cfg){ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
+
+// Pre-fill from saved config
+const cfg = loadCfg();
+document.getElementById("gh-token").value = cfg.token || "";
+document.getElementById("gh-owner").value = cfg.owner || "";
+document.getElementById("gh-repo").value = cfg.repo || "";
+document.getElementById("gh-branch").value = cfg.branch || "main";
+document.getElementById("ntfy-topic").value = cfg.ntfyTopic || "";
+
+document.getElementById("save-config").addEventListener("click", () => {
+  saveCfg({
+    token: document.getElementById("gh-token").value.trim(),
+    owner: document.getElementById("gh-owner").value.trim(),
+    repo: document.getElementById("gh-repo").value.trim(),
+    branch: document.getElementById("gh-branch").value.trim() || "main",
+    ntfyTopic: document.getElementById("ntfy-topic").value.trim()
+  });
+  setStatus("Setup saved in this browser.", "ok");
+});
+
+function setStatus(msg, cls){
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = "status" + (cls ? " " + cls : "");
+}
+
+async function githubRequest(path, options, cfg){
+  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${cfg.branch}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      "Authorization": `Bearer ${cfg.token}`,
+      "Accept": "application/vnd.github+json",
+      ...(options && options.headers ? options.headers : {})
+    }
+  });
+  return res;
+}
+
+function b64EncodeUnicode(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+function b64DecodeUnicode(str) {
+  return decodeURIComponent(escape(atob(str)));
+}
+
+document.getElementById("publish-btn").addEventListener("click", async () => {
+  const entered = document.getElementById("passcode").value.trim().toLowerCase();
+  if (entered !== ADMIN_PASSCODE) {
+    setStatus("Wrong passcode.", "err");
+    return;
+  }
+  const cfg = loadCfg();
+  if (!cfg.token || !cfg.owner || !cfg.repo) {
+    setStatus("Fill in and save the one-time GitHub setup above first.", "err");
+    return;
+  }
+
+  const dayNum = parseInt(document.getElementById("day-number").value, 10);
+  const letter = document.getElementById("letter-text").value;
+  const game = document.getElementById("game-type").value || null;
+  const song = document.getElementById("song-link").value.trim();
+
+  if (!dayNum || !letter.trim()) {
+    setStatus("Add a day number and a letter first.", "err");
+    return;
+  }
+
+  setStatus("Publishing...");
+  const btn = document.getElementById("publish-btn");
+  btn.disabled = true;
+
+  try {
+    // 1. Get current file + sha
+    const getRes = await githubRequest("data/days.json", { method: "GET" }, cfg);
+    if (!getRes.ok) throw new Error("Couldn't read days.json (check token/owner/repo). " + getRes.status);
+    const getJson = await getRes.json();
+    const sha = getJson.sha;
+    const current = JSON.parse(b64DecodeUnicode(getJson.content));
+
+    // 2. Update or insert this day's record
+    const idx = current.days.findIndex(d => d.day === dayNum);
+    const record = { day: dayNum, letter, game, song, published: true };
+    if (idx >= 0) current.days[idx] = record;
+    else current.days.push(record);
+    current.days.sort((a, b) => a.day - b.day);
+
+    // 3. Commit updated file
+    const newContent = b64EncodeUnicode(JSON.stringify(current, null, 2));
+    const putRes = await githubRequest("data/days.json", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `Add letter for Day ${dayNum}`,
+        content: newContent,
+        sha,
+        branch: cfg.branch
+      })
+    }, cfg);
+
+    if (!putRes.ok) {
+      const errText = await putRes.text();
+      throw new Error("GitHub rejected the update: " + errText);
+    }
+
+    setStatus("Published Day " + dayNum + " ✓", "ok");
+
+    // 4. Optional notification via ntfy.sh
+    if (cfg.ntfyTopic) {
+      try {
+        await fetch(`https://ntfy.sh/${encodeURIComponent(cfg.ntfyTopic)}`, {
+          method: "POST",
+          headers: {
+            "Title": "A new letter is waiting 💌",
+            "Click": "https://" + cfg.owner + ".github.io/" + cfg.repo + "/index.html"
+          },
+          body: "Day " + dayNum + " is ready for you."
+        });
+        setStatus("Published Day " + dayNum + " ✓ (notification sent)", "ok");
+      } catch (e) {
+        setStatus("Published Day " + dayNum + " ✓ (notification failed to send — check the ntfy topic)", "ok");
+      }
+    }
+  } catch (e) {
+    setStatus("Something went wrong: " + e.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
